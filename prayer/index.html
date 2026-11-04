@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Pebbsz — Today's prayer</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; background: #fff; }
+    body { color: #37352f; -webkit-text-size-adjust: 100%; }
+    .prayer-widget {
+      width: 100%; padding: 22px;
+      font-family: Georgia, 'Times New Roman', serif;
+      overflow-wrap: break-word;
+    }
+    .prayer-heading { display: flex; align-items: center; gap: 12px; }
+    .prayer-cross { display: block; width: 42px; height: 42px; flex: 0 0 42px; color: #aa7942; }
+    .prayer-cross svg { display: block; width: 100%; height: 100%; }
+    .prayer-heading h1 {
+      margin: 0; font: 700 30px/1.3 Georgia, 'Times New Roman', serif;
+      letter-spacing: -0.7px;
+    }
+    .prayer-text {
+      margin: 18px 0 0; font-size: 20px; line-height: 1.65;
+      white-space: pre-line;
+    }
+    @media (max-width: 420px) {
+      .prayer-widget { padding: 18px; }
+      .prayer-heading h1 { font-size: 28px; }
+      .prayer-text { font-size: 18px; }
+    }
+    @media (max-width: 359px) {
+      .prayer-widget { padding: 16px; }
+      .prayer-heading h1 { font-size: 24px; }
+      .prayer-cross { width: 34px; height: 34px; flex-basis: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="prayer-widget" aria-label="Daily prayer">
+    <header>
+      <div class="prayer-heading">
+        <span class="prayer-cross" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M24 7v34M12 19h24"/>
+          </svg>
+        </span>
+        <h1>Today’s prayer</h1>
+      </div>
+    </header>
+    <section aria-live="polite" aria-atomic="true">
+      <p id="prayer-text" class="prayer-text">Heavenly Father, thank You for this new day. Guide my thoughts, words, and choices. Help me welcome small beginnings and recognize the opportunities to love that You place before me. Amen.</p>
+    </section>
+  </main>
+  <script>
+    (function () {
+      'use strict';
+
+      // To use your own prayers, replace the prayer text below.
+      // Add more entries to lengthen the daily rotation.
+      var prayers = [
+        {
+          text: "Heavenly Father, thank You for this new day. Guide my thoughts, words, and choices. Help me welcome small beginnings and recognize the opportunities to love that You place before me. Amen."
+        },
+        {
+          text: "Lord Jesus, You know everything weighing on my heart. Quiet my racing thoughts and help me focus on what needs my attention today. Give me peace as I place the rest in Your hands. Amen."
+        },
+        {
+          text: "Loving Father, be near me in discomfort, fatigue, and uncertainty. Guide those who care for me. Help me listen to my body, accept support, and treat myself with patience and compassion. Amen."
+        },
+        {
+          text: "Lord, watch over my husband and children wherever this day takes them. Fill our home with patience, laughter, forgiveness, and love. Help me give the people closest to me my attention and kindness. Amen."
+        },
+        {
+          text: "Heavenly Father, strengthen the love my husband and I share. Teach us to listen carefully, speak gently, and make time for one another. Keep our hearts open to Your guidance as we grow together. Amen."
+        },
+        {
+          text: "Holy Spirit, bring clarity to my studying and patience to my learning. Help me understand difficult ideas and learn from mistakes. Give me courage to pursue my calling and faithfulness in the work before me. Amen."
+        },
+        {
+          text: "Lord, help me approach my work with integrity, care, and a clear mind. Remind me of the people behind each task. Give me wisdom in difficult moments and compassion for those who are suffering. Amen."
+        },
+        {
+          text: "Father, help me build habits that support the life You have entrusted to me. Give me willingness to begin, patience to grow, and grace to return after difficult days. Teach me to value rest, too. Amen."
+        },
+        {
+          text: "Lord, guide me in caring for our finances. Give me wisdom to plan, patience to save, and gratitude for what we have. Help us meet our responsibilities and remain generous toward others. Amen."
+        },
+        {
+          text: "Lord Jesus, thank You for walking with me today. Forgive my shortcomings and help me recognize the good. I entrust my loved ones and unfinished tasks to You. Grant us peaceful sleep and renewed strength. Amen."
+        }
+      ];
+
+      var textElement = document.getElementById('prayer-text');
+      var firstDay = Date.UTC(2026, 10, 3) / 86400000;
+      var displayedDay = null;
+      var midnightTimer;
+
+      function updatePrayer() {
+        var now = new Date();
+        // Count calendar dates so daylight-saving changes do not skip a prayer.
+        var today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000;
+        if (today === displayedDay || prayers.length === 0) { return; }
+
+        var index = ((today - firstDay) % prayers.length + prayers.length) % prayers.length;
+        var prayer = prayers[index];
+        textElement.textContent = prayer.text;
+        displayedDay = today;
+      }
+
+      function scheduleMidnight() {
+        window.clearTimeout(midnightTimer);
+        var now = new Date();
+        var midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        midnightTimer = window.setTimeout(function () {
+          updatePrayer();
+          scheduleMidnight();
+        }, Math.max(1000, midnight.getTime() - now.getTime() + 100));
+      }
+
+      function refresh() {
+        updatePrayer();
+        scheduleMidnight();
+      }
+
+      refresh();
+      // Also recover when the mobile app resumes or the device clock changes.
+      window.setInterval(updatePrayer, 60000);
+      window.addEventListener('pageshow', refresh);
+      window.addEventListener('focus', refresh);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) { refresh(); }
+      });
+    }());
+  </script>
+</body>
+</html>
