@@ -1,0 +1,53 @@
+name: Sync birthdays from Notion
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: birthday-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Check calendar connection
+        id: connection
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          BIRTHDAY_WIDGET_KEY: ${{ secrets.BIRTHDAY_WIDGET_KEY }}
+        run: |
+          if [ -n "$NOTION_TOKEN" ] && [ -n "$BIRTHDAY_WIDGET_KEY" ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Calendar sync is waiting for NOTION_TOKEN and BIRTHDAY_WIDGET_KEY in repository Actions secrets.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Read Notion and encrypt birthdays
+        if: steps.connection.outputs.ready == 'true'
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          BIRTHDAY_WIDGET_KEY: ${{ secrets.BIRTHDAY_WIDGET_KEY }}
+        run: node birthdays/sync.mjs
+      - name: Save encrypted feed
+        if: steps.connection.outputs.ready == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add birthdays/data.json
+          if git diff --cached --quiet; then
+            echo 'No birthday changes to save.'
+            exit 0
+          fi
+          git commit -m 'Refresh encrypted birthday feed'
+          git pull --rebase
+          git push

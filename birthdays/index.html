@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Birthdays</title>
+  <style>
+    :root { color-scheme: light; --brown: #784b36; --muted: #87634f; --line: #e8dbd1; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 4px 10px; background: transparent; color: var(--brown); font-family: Garamond, "Times New Roman", serif; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    .birthday { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 13px 2px; }
+    .birthday + .birthday { border-top: 1px solid var(--line); }
+    .balloon { width: 20px; height: 29px; color: var(--brown); }
+    .name { display: block; font-size: 19px; font-weight: 400; overflow-wrap: anywhere; }
+    .date { display: block; margin-top: 3px; color: var(--muted); font-size: 14px; }
+    .countdown { font-size: 16px; white-space: nowrap; text-align: right; }
+    .today { font-weight: 700; }
+    #message { margin: 12px 0; font-size: 15px; line-height: 1.5; }
+    #refresh-status { margin: 5px 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    @media (max-width: 300px) {
+      .birthday { grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+      .balloon { grid-row: 1 / 3; align-self: start; }
+      .countdown { grid-column: 2; text-align: left; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; --brown: #d5af91; --muted: #c8aa92; --line: #594438; }
+    }
+  </style>
+</head>
+<body>
+  <ul id="birthdays" aria-label="Birthdays this month" aria-live="polite"></ul>
+  <p id="message" role="status">Loading birthdays…</p>
+  <p id="refresh-status" role="status" hidden></p>
+  <script>
+  'use strict';
+  // Your Notion token stays in GitHub Actions. Never put it in this file.
+  const CONFIG = {
+    owner: 'jazminenicole221-24',
+    repo: 'pebbsz-widgets',
+    path: 'birthdays/data.json',
+    timeZone: 'America/New_York'
+  };
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAY = 86400000;
+  const list = document.getElementById('birthdays');
+  const message = document.getElementById('message');
+  const refreshStatus = document.getElementById('refresh-status');
+  let entries = null, busy = false, lastRefresh = 0;
+
+  function calendarDay(now = new Date()) {
+    const parts = {};
+    new Intl.DateTimeFormat('en-US', {timeZone: CONFIG.timeZone, year:'numeric', month:'numeric', day:'numeric'})
+      .formatToParts(now).forEach(part => parts[part.type] = part.value);
+    return {year: +parts.year, month: +parts.month, day: +parts.day};
+  }
+  function serial(date) { return Date.UTC(date.year, date.month - 1, date.day) / DAY; }
+  function nextBirthday(entry, today) {
+    const inYear = year => ({year, month:entry.month, day:Math.min(entry.day, new Date(Date.UTC(year, entry.month, 0)).getUTCDate())});
+    let next = inYear(today.year);
+    if (serial(next) < serial(today)) next = inYear(today.year + 1);
+    return next;
+  }
+  function validEntry(entry) {
+    return entry && typeof entry.name === 'string' && entry.name.trim() && entry.name.length <= 180 &&
+      Number.isInteger(entry.month) && entry.month >= 1 && entry.month <= 12 &&
+      Number.isInteger(entry.day) && entry.day >= 1 && entry.day <= new Date(Date.UTC(2000, entry.month, 0)).getUTCDate();
+  }
+  function birthdaysThisMonth(values, now = new Date()) {
+    const today = calendarDay(now);
+    const seen = new Set();
+    return values.filter(validEntry).filter(entry => {
+      const key = entry.name.normalize('NFKC').trim().toLowerCase() + '|' + entry.month + '|' + entry.day;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return entry.month === today.month;
+    }).map(entry => ({...entry, days:serial(nextBirthday(entry, today)) - serial(today)}))
+      .sort((a,b) => a.days - b.days || a.name.localeCompare(b.name));
+  }
+  function balloon() {
+    const namespace = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(namespace, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 34');
+    svg.setAttribute('class', 'balloon');
+    svg.setAttribute('aria-hidden', 'true');
+    const body = document.createElementNS(namespace, 'ellipse');
+    body.setAttribute('cx', '12'); body.setAttribute('cy', '10'); body.setAttribute('rx', '8'); body.setAttribute('ry', '10'); body.setAttribute('fill', 'currentColor');
+    const knot = document.createElementNS(namespace, 'path');
+    knot.setAttribute('d', 'M12 19 L9 23 L15 23 Z'); knot.setAttribute('fill', 'currentColor');
+    const string = document.createElementNS(namespace, 'path');
+    string.setAttribute('d', 'M12 23 C7 27 17 29 11 33'); string.setAttribute('fill', 'none'); string.setAttribute('stroke', 'currentColor'); string.setAttribute('stroke-width', '1.4');
+    svg.append(body, knot, string);
+    return svg;
+  }
+  function render() {
+    if (entries === null) return;
+    const rows = birthdaysThisMonth(entries);
+    const fragment = document.createDocumentFragment();
+    rows.forEach(entry => {
+      const row = document.createElement('li'); row.className = 'birthday';
+      const details = document.createElement('div');
+      const name = document.createElement('span'); name.className = 'name'; name.textContent = entry.name;
+      const date = document.createElement('span'); date.className = 'date'; date.textContent = MONTHS[entry.month - 1] + ' ' + entry.day;
+      details.append(name, date);
+      const countdown = document.createElement('span');
+      countdown.className = 'countdown' + (entry.days === 0 ? ' today' : '');
+      countdown.textContent = entry.days === 0 ? 'Today 🎉' : 'In ' + entry.days + (entry.days === 1 ? ' day' : ' days');
+      row.append(balloon(), details, countdown); fragment.append(row);
+    });
+    list.replaceChildren(fragment);
+    message.textContent = rows.length ? '' : 'No birthdays this month.';
+    message.hidden = rows.length > 0;
+  }
+  function bytes(base64) { return Uint8Array.from(atob(base64), character => character.charCodeAt(0)); }
+  async function decryptFeed(feed, hexKey) {
+    if (feed?.version !== 1 || !feed.iv || !feed.data) throw new Error('feed');
+    const rawKey = Uint8Array.from(hexKey.match(/../g), value => parseInt(value, 16));
+    const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
+    const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:bytes(feed.iv)}, key, bytes(feed.data));
+    const data = JSON.parse(new TextDecoder().decode(plain));
+    if (!Array.isArray(data.birthdays) || !data.birthdays.every(validEntry)) throw new Error('feed');
+    return data.birthdays;
+  }
+  const privateKey = new URLSearchParams(location.hash.slice(1)).get('key') || '';
+  async function refresh() {
+    if (busy) return;
+    if (!/^[a-f0-9]{64}$/i.test(privateKey)) {
+      message.textContent = 'Use the private embed link from Start Here to connect your birthdays.';
+      return;
+    }
+    busy = true;
+    try {
+      const endpoint = 'https://api.github.com/repos/' + encodeURIComponent(CONFIG.owner) + '/' + encodeURIComponent(CONFIG.repo) + '/contents/' + CONFIG.path;
+      const response = await fetch(endpoint, {headers:{Accept:'application/vnd.github+json'}, cache:'no-store', credentials:'omit', referrerPolicy:'no-referrer', signal:AbortSignal.timeout(15000)});
+      if (!response.ok) throw new Error('http-' + response.status);
+      const file = await response.json();
+      if (file.encoding !== 'base64' || typeof file.content !== 'string') throw new Error('feed');
+      const feed = JSON.parse(new TextDecoder().decode(bytes(file.content.replace(/\s/g, ''))));
+      try { entries = await decryptFeed(feed, privateKey); }
+      catch { throw new Error('key'); }
+      refreshStatus.hidden = true;
+      lastRefresh = Date.now();
+      render();
+    } catch (error) {
+      const text = error.message === 'key' ? 'The private link could not unlock birthdays. Check that its key matches BIRTHDAY_WIDGET_KEY in GitHub.' :
+        error.message === 'http-404' ? 'Birthday data is not ready. Run “Sync birthdays from Notion” in GitHub Actions first.' :
+        'Birthday sync is unavailable. Check your connection and GitHub Actions, then reload.';
+      if (entries === null) { message.textContent = text; message.hidden = false; }
+      else { refreshStatus.textContent = 'Showing the last loaded birthdays. Refresh will retry automatically.'; refreshStatus.hidden = false; }
+    } finally { busy = false; }
+  }
+  refresh();
+  setInterval(render, 60000);
+  setInterval(() => { if (!document.hidden) refresh(); }, 15 * 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { render(); if (Date.now() - lastRefresh > 15 * 60000) refresh(); }
+  });
+  </script>
+</body>
+</html>
