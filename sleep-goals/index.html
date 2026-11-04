@@ -1,4 +1,5 @@
 <!doctype html>
+
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -15,36 +16,26 @@
       -webkit-text-size-adjust: 100%;
     }
     main { padding: 22px; }
-    header, dt { display: flex; align-items: center; gap: 12px; }
     svg { display: block; flex: none; color: #aa7942; }
-    header svg { width: 42px; height: 42px; }
-    h1 {
-      margin: 0;
-      font: 700 30px/1.3 Georgia, 'Times New Roman', serif;
-      letter-spacing: -0.7px;
-    }
     dl {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       max-width: 480px;
-      margin: 16px 0 0;
+      margin: 0;
     }
     .goal + .goal { border-left: 1px solid #e8e0d6; padding-left: 20px; }
-    dt { gap: 7px; color: #6e655d; font-size: 16px; line-height: 1.4; }
+    dt { display: flex; align-items: center; gap: 7px; color: #6e655d; font-size: 16px; line-height: 1.4; }
     dt svg { width: 20px; height: 20px; }
     dd { margin: 4px 0 0 27px; font-size: 26px; line-height: 1.25; }
     time { white-space: nowrap; }
     .period { font-size: 0.58em; letter-spacing: 0.04em; }
     @media (max-width: 420px) {
       main { padding: 18px; }
-      h1 { font-size: 28px; }
       .goal + .goal { padding-left: 14px; }
       dd { font-size: 24px; }
     }
     @media (max-width: 359px) {
       main { padding: 16px; }
-      header svg { width: 34px; height: 34px; }
-      h1 { font-size: 24px; }
     }
     @media (max-width: 299px) {
       dl { grid-template-columns: 1fr; gap: 14px; }
@@ -53,15 +44,7 @@
   </style>
 </head>
 <body>
-  <main aria-labelledby="sleep-goals-title">
-    <header>
-      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.4"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-        <path d="M6 12v26m0-7h36v7M6 26h36v5M22 26V15h13a7 7 0 0 1 7 7v4"/>
-        <rect x="10" y="16" width="9" height="7" rx="3"/>
-      </svg>
-      <h1 id="sleep-goals-title">Sleep Goals</h1>
-    </header>
+  <main aria-label="Sleep goals">
     <dl>
       <div class="goal">
         <dt>
