@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Stopwatch</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: #37352f;
+      font-family: Georgia, 'Times New Roman', serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    main {
+      width: 100%;
+      padding: 22px;
+      text-align: center;
+    }
+    .invitation {
+      margin: 0 0 12px;
+      color: #786e64;
+      font-size: 18px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+    .clock {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .clock-icon {
+      width: 32px;
+      height: 32px;
+      flex: none;
+      color: #aa7942;
+    }
+    .elapsed {
+      display: block;
+      font-size: clamp(36px, 13vw, 56px);
+      font-weight: 400;
+      font-variant-numeric: lining-nums tabular-nums;
+      line-height: 1.15;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .elapsed.has-hours { font-size: clamp(28px, 10.5vw, 48px); }
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    button {
+      min-height: 44px;
+      font: 16px/1.3 Georgia, 'Times New Roman', serif;
+      cursor: pointer;
+    }
+    button:focus-visible {
+      outline: 2px solid #aa7942;
+      outline-offset: 3px;
+    }
+    .primary {
+      min-width: 110px;
+      padding: 10px 26px;
+      border: 1px solid #76532c;
+      border-radius: 6px;
+      background: #76532c;
+      color: #fff;
+    }
+    .primary:hover { background: #654625; }
+    .reset {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      padding: 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #aa7942;
+    }
+    .reset svg { display: block; width: 22px; height: 22px; }
+    .reset:hover:enabled { background: #faf7f3; }
+    .reset:disabled { opacity: 0.35; cursor: default; }
+    .screen-reader {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (max-width: 420px) {
+      main { padding: 18px; }
+    }
+    @media (max-width: 359px) {
+      main { padding: 16px; }
+      .clock-icon { width: 28px; height: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <main aria-label="Stopwatch">
+    <p class="invitation">Whenever you’re ready</p>
+    <div class="clock">
+      <svg class="clock-icon" viewBox="0 0 48 48" fill="none"
+           stroke="currentColor" stroke-width="3.4" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="24" cy="27" r="15"/>
+        <path d="M19 5h10M24 5v7M36 15l4-4M24 19v9l7 4"/>
+      </svg>
+      <output id="elapsed" class="elapsed" role="timer" aria-live="off" aria-label="Elapsed time">00:00</output>
+    </div>
+    <div class="controls">
+      <button id="toggle" class="primary" type="button" aria-label="Start stopwatch">Start</button>
+      <button id="reset" class="reset" type="button" aria-label="Reset stopwatch" title="Reset stopwatch" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 4v5h5M4.5 8a8 8 0 1 1-0.1 8"/>
+        </svg>
+      </button>
+    </div>
+    <p id="status" class="screen-reader" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    (function () {
+      'use strict';
+
+      var display = document.getElementById('elapsed');
+      var toggleButton = document.getElementById('toggle');
+      var resetButton = document.getElementById('reset');
+      var status = document.getElementById('status');
+      var storageKey = 'pebbsz-stopwatch-v1:' + window.location.pathname;
+      var accumulatedMs = 0;
+      var startedAt = null;
+
+      function restore() {
+        try {
+          var stored = window.localStorage.getItem(storageKey);
+          if (stored === null) {
+            accumulatedMs = 0;
+            startedAt = null;
+            return;
+          }
+          var saved = JSON.parse(stored);
+          if (!saved || saved.version !== 1) { return; }
+          if (!Number.isFinite(saved.accumulatedMs) || saved.accumulatedMs < 0) { return; }
+          if (saved.startedAt !== null && (!Number.isFinite(saved.startedAt) || saved.startedAt < 0)) { return; }
+          accumulatedMs = saved.accumulatedMs;
+          startedAt = saved.startedAt;
+        } catch (error) {
+          // The stopwatch also works when an embedded browser blocks storage.
+        }
+      }
+
+      function save() {
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify({
+            version: 1,
+            accumulatedMs: accumulatedMs,
+            startedAt: startedAt
+          }));
+        } catch (error) {
+          // Keep the current session usable if storage is unavailable.
+        }
+      }
+
+      function elapsedMs() {
+        if (startedAt === null) { return accumulatedMs; }
+        // Timestamps keep time even while a mobile app throttles its updates.
+        return accumulatedMs + Math.max(0, Date.now() - startedAt);
+      }
+
+      function pad(number) {
+        return String(number).padStart(2, '0');
+      }
+
+      function render() {
+        var elapsed = elapsedMs();
+        var seconds = Math.floor(elapsed / 1000);
+        var hours = Math.floor(seconds / 3600);
+        var minutes = Math.floor(seconds / 60) % 60;
+        var text = pad(minutes) + ':' + pad(seconds % 60);
+        if (hours > 0) { text = pad(hours) + ':' + text; }
+        if (display.textContent !== text) { display.textContent = text; }
+        display.classList.toggle('has-hours', hours > 0);
+        toggleButton.textContent = startedAt === null ? 'Start' : 'Stop';
+        toggleButton.setAttribute('aria-label', startedAt === null ? 'Start stopwatch' : 'Stop stopwatch');
+        resetButton.disabled = startedAt === null && accumulatedMs === 0;
+      }
+
+      toggleButton.addEventListener('click', function () {
+        if (startedAt === null) {
+          startedAt = Date.now();
+          status.textContent = 'Stopwatch started.';
+        } else {
+          accumulatedMs = elapsedMs();
+          startedAt = null;
+        }
+        save();
+        render();
+        if (startedAt === null) { status.textContent = 'Stopped at ' + display.textContent + '.'; }
+      });
+
+      resetButton.addEventListener('click', function () {
+        accumulatedMs = 0;
+        startedAt = null;
+        save();
+        render();
+        status.textContent = 'Stopwatch reset.';
+        toggleButton.focus();
+      });
+
+      window.addEventListener('storage', function (event) {
+        if (event.key === storageKey || event.key === null) {
+          restore();
+          render();
+        }
+      });
+      window.addEventListener('pageshow', render);
+      window.addEventListener('focus', render);
+      document.addEventListener('visibilitychange', render);
+      window.setInterval(render, 250);
+      restore();
+      render();
+    }());
+  </script>
+</body>
+</html>
